@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0a1f0a">
+    <title>Golf GPS Navi</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --bg:#0a0f0a;
+            --surface:#141e04;
+            --surface2:#1a2e1a;
+            --surface3:#223322;
+            --green-vivid:#00e676;
+            --green-main:#4caf50;
+            --green-dark:#2e7d32;
+            --green-glow:rgba(0,230,118,0.15);
+            --gold:#ffd740;
+            --red:#ff5252;
+            --blue:#448aff;
+            --water:#40c4ff;
+            --sand:#ffe082;
+            --white:#fffffc;
+            --text:#e8f5e9;
+            --text-dim:rgba(255,255,255,0.5);
+            --text-dimmer:rgba(255,255,255,0.3);
+            --radius:16px;
+            --radius-lg:24px;
+            --shadow:0 8px 32px rgba(0,0,0,0.4);
+            --glow:0 0 20px rgba(0,230,118,0.2);
+        }
+        body{
+            font-family:'Inter',system-ui,-apple-system,sans-serif;
+            background:var(--bg);color:var(--text);
+            overflow:hidden;height:100vh;height:100dvh;
+            -webkit-user-select:none;user-select:none;
+            -webkit-tap-highlight-color:transparent;
+        }
+
+        /* ===== SPLASH ===== */
+        #splash{
+            position:fixed;inset:0;z-index:9999;
+            background:var(--bg);
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            transition:opacity 0.6s cubic-bezier(.4,0,.2,1);
+        }
+        #splash.hidden{opacity:0;pointer-events:none}
+        .splash-icon{
+            width:100px;height:100px;
+            background:linear-gradient(135deg,var(--green-vivid),var(--green-dark));
+            border-radius:28px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:52px;
+            box-shadow:var(--glow),0 20px 60px rgba(0,230,118,0.15);
+            animation:pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow{
+            0%,100%{box-shadow:var(--glow),0 20px 60px rgba(0,230,118,0.15)}
+            50%{box-shadow:0 0 40px rgba(0,230,118,0.3),0 20px 60px rgba(0,230,118,0.25)}
+        }
+        .splash-title{
+            font-family:'Outfit',sans-serif;
+            font-size:32px;font-weight:800;
+            background:linear-gradient(135deg,var(--green-vivid),var(--white));
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+            margin-top:20px;letter-spacing:3px;
+        }
+        .splash-sub{color:var(--text-dim);font-size:13px;margin-top:6px;letter-spacing:1px;}
+        .splash-loader{
+            margin-top:48px;width:48px;height:48px;
+            border:2px solid var(--surface3);border-top-color:var(--green-vivid);
+            border-radius:50%;animation:spin .7s linear infinite;
+        }
+        @keyframes spin: {to { transform: rotate(360deg); }}
+
+        /* ===== SCREENQ��OOOOH
+���ܙY[��\�^N��ۙN���][ێ��^Y�[��]���^Y\�X�[ێ���[[��B���ܙY[��X�]�H�\�^N��^�B��ʈOOOOHPQT�OOOOH
+��XY\��X��ܛ�[���ؘJLMKL�L�N�X����Y�[\���\��
+N]�X��]X�X����Y�[\���\��
+NY[�ΈL�M�\�^N��^[YۋZ][\Έ�[�\��\�L��Z[�^�L�ܙ\�X���N�\��Y�ؘJ�MK�MK�MK��NZ[�ZZY��M�B��XY\�^ٛ۝\�^�N�M�ٛ۝]�ZY���ٛ^�N���܎��\�K]�]J_B��XY\��]۞ؘX��ܛ�[���ۙN؛ܙ\���ۙN��\��܎��[�\��Y[�΍ٛ۝\�^�N�M���܎��\�K]^Y[JN��[��][ێ���܈���XY\��]ێ�ݙ\����܎��\�K]^
+_B��XY\��[����\�^N��^�[YۋZ][\Θ�[�\���\��ٛ۝\�^�N�L����܎��\�K]^Y[[Y\�_B��XY\��[���ݙ���Y�M��ZY��M�B��ʈOOOOHPT
+��X\���][ێ��[]]�Nٛ^�NؘX��ܛ�[���\�KX��N�ݙ\���ΚY[�B��XY�]X�۝Z[�\��XY�]X�۝��^���H��X��ܛ�[���\�K\�\��X�L�HZ[\ܝ[��B��XY�]X�۝Z[�\��XY�]X�۝��^���HH���܎��\�K]^
+HZ[\ܝ[��B��XY�]X�۝Z[�\��XY�]X�۝��^���HN�ݙ\����܎��\�KYܙY[�]�]�Y
+HZ[\ܝ[��B��XY�]X�۝Z[�\��XY�]X�۝��^���HK�\�X�Y���܎��\�K]^Y[[Y\�HZ[\ܝ[���\��܎���X[��YZ[\ܝ[��B��ʈOOOOH�Y�T��US��OJ���Y]��][ێ��^Y���N�Y���Y���X��ܛ�[���\�K\�\��X�JN\�^N��^�^Y\�X�[ێ���[[��Z[�^�L�ܙ\�]��\��Y�\�K\�\��X�L�N[�[X][ێ��YK]\���X\�K[�]B���Y]YX���]KXX�]�WX�\���X��ܛ�[���\�K\�\��X�L�N�B���Y]YX��\�^N��^ݙ\���Έ]]��ܙ\�X���N�\��Y�\�K\�\��X�L�NB����\��X��ܛ�[���\�K\�\��X�L�NY[�ΌM��ܙ\�\�Y]\Ν�\�K\�Y]\�N\�^N��ۙNB���\��X�]�^\�^N��^�^Y\�X�[ێ���[[��\�M�B����\�ZXY\��۝\�^�N�M��۝]�ZY���X\��[�X���N�B������\�^N��^�\�[YۋZ][\Θ�[�\�X\��[�X���N�B�����ݞ�Y��ZY����^\�[�ΌB������]^ٛ^�_B���[�]ܘ\\�\�^N��^�\�[YۋZ][\Θ�[�\��^�NB��[�]]ܘ\\�[�]�X��ܛ�[���\�K\�\��X�L�N�ܙ\���ۙN�ܙ\�\�Y]\Ν�\�KK\�Y]\�NY[�ΎM��[\��[��\�
+�JN��܎��\�K]^
+N�Y�L	NB��[�]]ܘ\\�[�]����\��][�N��ۙN�[\��[��\�
+�JNB�������\�^N��^�^Y\�X�[ێ���[[��\�B�� K\�Y]\�[Ό�K\�Y�Ό̜�ؘJ�
+NKY��Ό��ؘJ��LN��NB���^�۝Y�[Z[N��[�\���\�[K]ZKX\K\�\�[K�[��\�\�Y��X��ܛ�[���\�KX��N���܎��\�K]^
+Nݙ\���ΚY[��ZY��L��ZY��L�]�X��]]\�\�\�[X���ۙN�\�\�\�[X���ۙN]�X��]]\ZY�Y�X��܎��[��\�[�B��ʈOOOOH�T�OOOOH
+���\���][ێ��^Y�[��]�ދZ[�^�NNNN�X��ܛ�[���\�KX��N\�^N��^ٛ^Y\�X�[ێ���[[��[YۋZ][\Θ�[�\�ڝ\�Y�KX�۝[���[�\��[��][ێ��X�]H����X�X�X�^�Y\����JNB���\��Y[���X�]N���[�\�Y]�[�Λ�ۙ_B���\�ZX�۞�Y�L�ZY��L�X��ܛ�[��[�X\�YܘYY[�
+L�YY��\�KYܙY[�]�]�Y
+K�\�KYܙY[�Y\��JN�ܙ\�\�Y]\Ό�\�^N��^�[YۋZ][\Θ�[�\�ڝ\�Y�KX�۝[���[�\��۝\�^�N�L���\�Y�Ν�\�KY���K���ؘJ��LN�MJN[�[X][ێ�[�KY�����X\�KZ[�[�][��[�]NB��^Y��[Y\�[�KY���	KL	^؛�\�Y�Ν�\�KY���K���ؘJ��LN�MJ_B�L	^؛�\�Y�Ό�ؘJ��LN��K���ؘJ��LN��J_B�B���\�]]^�۝Y�[Z[N���]�]	��[��\�\�Y��۝\�^�N�̜ٛ۝]�ZY���X��ܛ�[��[�X\�YܘYY[�
+L�YY��\�KYܙY[�]�]�Y
+K�\�K]�]JJN]�X��]X�X��ܛ�[�X�\�^�]�X��]]^Y�[X��܎��[��\�[�X\��[�]����]\�\�X�[�Ό�B���\�\�X����܎��\�K]^Y[JNٛ۝\�^�N�L��X\��[�]����]\�\�X�[�Ό\�B���\�[�Y\�X\��[�]����Y��ZY���ܙ\�����Y�\�K\�\��X�L�N؛ܙ\�]�X��܎��\�KYܙY[�]�]�Y
+N�ܙ\�\�Y]\΍L	N�[�[X][ێ��[����[�X\�[��[�]NB��^Y��[Y\��[������[�ٛܛN���]J͌Y�N�_B��ʈOOOOH�ԑQS�`���������67&VV��F�7������S��6�F���f��VC���6WC��f�W��F�&V7F���6��V��Т�67&VV��7F�fR�F�7���f�W��Р��������TDU"��������VFW"��&6�w&�V�C�&v&��R���"���&6�G&��f��FW#�&�W"�#�����vV&��B�&6�G&��f��FW#�&�W"�#����FF��s�'�g���F�7���f�W���Ɩv�֗FV�3�6V�FW#��v�'����֖�FW����&�&FW"�&�GF�Ӣ�6�ƖB&v&�#SR�#SR�#SR��b���֖�ֆV�v�C�Sg���Т b �3'��f��B�vV�v�C����&6�w&�V�C�Ɩ�V"�w&F�V�B�3VFVr�f"���w&VV��f�f�B��f"���v��FR�����vV&��B�&6�w&�V�B�6Ɨ�FW�C��vV&��B�FW�B�f����6���#�G&�7&V�C���&v���F��#���WGFW"�76��s�7���Т�7�6��7V'�6���#�f"���FW�B�F�ғ�f��B�6��S�7���&v���F��g���WGFW"�76��s���Т�7�6����FW'���&v���F��C���v�GF��C����V�v�C�C����&�&FW#�'�6�ƖBf"���7W&f6S2��&�&FW"�F��6���#�f"���w&VV��f�f�B���&�&FW"�&F�W3�SS���F���7���w2Ɩ�V"��f��FS��Т�W�g&�W27���F��G&�6f�&Ӣ&�FFR�3cFVr���Р�������45$TT�(�����􀨼(���������͍ɕ���쁑������聹������ͥѥ��聙�ᕐ쁥�͕���쁙��൑�ɕ�ѥ��聍��յ���(���������͍ɕ�����ѥٔ�쁑������聙�����((����������������!H�����􀨼(��������������ȁ�(�����������������ɽչ��ɝ��������԰��������Ȥ�(�����������������ɽ�����ѕ�聉��Ƞ�����(�������������ݕ���е�����ɽ�����ѕ�聉��Ƞ�����(������������������������������(�������������������聙����(�������������������ѕ��聍��ѕ��(���������������������(������������赥���������(��������������ɑ�ȵ���ѽ������ͽ����ɝ�����԰���԰���԰����ؤ�(����������������������������(���������(���� ���������ȁ��홽�еͥ������홽�еݕ��������홱����퍽����مȠ��ݡ�є��(����������ȁ���ѽ�퉅���ɽչ�鹽��퉽ɑ��鹽�����ͽ������ѕ�����������������홽�еͥ������퍽����مȠ��ѕ�е������Ʌ�ͥѥ��鍽��Ȁ����(����������ȁ���ѽ�顽ٕ�퍽����مȠ��ѕ�Х�(����������Ȁ�����푥�����陱��텱�����ѕ��鍕�ѕ�흅�����홽�еͥ������퍽����مȠ��ѕ�е�����ȥ�(����������Ȁ�������ٝ�ݥ�Ѡ������������������((������������5@���(�����������ͥѥ���ɕ��ѥٔ홱����퉅���ɽչ��مȠ�������ٕə���顥�����(�����������е���х���Ȁ�������е����ɽ��齽��쁉����ɽչ��مȠ����ə���Ȥ�������х����(�����������е���х���Ȁ�������е����ɽ��齽����쁍�����مȠ��ѕ�Ф�������х����(�����������е���х���Ȁ�������е����ɽ��齽���顽ٕȁ쁍�����مȠ���ɕ���٥٥���������х����(�����������е���х���Ȁ�������е����ɽ��齽������ͅ�����쁍�����مȠ��ѕ�е�����Ȥ�������х��쁍��ͽ�聹�е����ݕ��������х����((������������ITeIQIAU=L�����(�����͡����(����������ͥѥ��陥ᕐ�(�����������ѽ����(���������������(��������ɥ������(�������������ɽչ��مȠ����ə�����(���������������陱���(�����������൑�ɕ�ѥ��鍽�յ��(��������赥��������(����������ɑ�ȵѽ������ͽ����مȠ����ə���̤�(�������������ѥ���ͱ����������́��͔�����(�����(�����͡��е�х�́m��ф���ѥٕu��ɑ쁉����ɽչ��مȠ����ə���Ȥ��(�����͡��е�х�́�(���������������聙����(���������ٕə���聅�Ѽ�(����������ɑ�ȵ���ѽ������ͽ����مȠ����ə���̤�(�����((�������ɑ�(�������������ɽչ��مȠ����ə���Ȥ�(���������������������(����������ɑ�ȵɅ�����مȠ��Ʌ���̤�(���������������鹽���(�����(�������ɐ���ѥٕ�(���������������陱���(�����������൑�ɕ�ѥ��鍽�յ��(�����������������(�����((�������ɐ��������(�����������еͥ�������(�����������еݕ���������(����������ɝ������ѽ������(�����((�����ɽ��(���������������陱���(����������������(���������������ѕ��鍕�ѕ��(����������ɝ������ѽ������(�����(�����ɽ܁���(��������ݥ�Ѡ������(��������������������(������������͡������(�����(�����ɽ܀���х홱�����((�����������Ʌ�����(���������������陱���(����������������(���������������ѕ��鍕�ѕ��(���������������(�����(���������е�Ʌ���ȁ������(�������������ɽչ��مȠ����ə���̤�(����������ɑ��鹽���(����������ɑ�ȵɅ�����مȠ���Ʌ���̤�(�������������������������(�����������ѕ�聥�ٕ�Р��Ĥ�(��������������مȠ��ѕ�Ф�(��������ݥ�Ѡ������(�����(���������е�Ʌ���ȁ�����陽����(����������ѱ���鹽���(�����������ѕ�聥�ٕ�Р��Ԥ�(�����((�����ɽ�́�(���������������聙����(�����������൑�ɕ�ѥ��聍��յ��(����������������(�����(���� ��԰��԰�а���Ԥ��(��������������ɑ�������ͽ����ɝ�����԰��԰��԰���ؤ�쁉�ɑ�ȵɅ���������홽�еͥ������쁍�����مȠ��ѕ�е����쁍��ͽ������ѕ���(�����������ȵ�Ѹ顽ٕȁ쁉����ɽչ��ɝ�����԰��԰��԰��Ĥ��(�����������ȵ�Ѹ配ѥٔ�쁉����ɽչ��ɝ�����԰��԰��԰���Ԥ��((�����������ѥ����ѹ�푥�����陱��흅��������ɝ������ѽ����((�����������ȵ�Ѹ��ٜ(���������(������������ݥ�Ѡ������(������������������������(���������((���������������(�������������������聙����(�������������������ѕ��聍��ѕ��(���������������ѥ�䵍��ѕ��聍��ѕ��(������������ݥ�Ѡ������(������������������������(������������������������(���������������ͽ������ѕ��(���������((�������������顽ٕȁ�(�����������������ɽչ��مȠ����ə���̤�(��������������ɑ�ȵɅ�����مȠ��Ʌ���̤�(���������(���� (��������������ȵɽ܁ѥѱ�(���������(���������������еݕ���������(����������������������(��������������ɝ�����(���������(��������������ȵ������(�������������������(�������������������陱���(�������������������ѕ��聍��ѕ��(���������������ѥ�䵍��ѕ��聙��ൕ���(��������������������(���������(��������������ȵɽ܁���͔��Ѹ��(�����������������ɽչ�聹����(��������������ɑ��聹����(���������������ͽ������ѕ��(��������������������������(������������������مȠ��ѕ�е�����(�������������Ʌ�ͥѥ��聍���Ȁ�����(���������(��������������ȵɽ܁���͔��Ѹ顽ٕ�(���������(������������������مȠ��ѕ�Ф�(���������((�����������ɐ����ɐ������ȁ�(���������������еͥ�������(���������������еݕ���������(��������������ɝ������ѽ������(�������������������聙����(�������������������ѕ��聍��ѕ��(���������������ѥ�䵍��ѕ������������ݕ���(���������((�����������ɐ����ɐ������Ȁ��聠�쁙�������(����ba(255,215,64,0.05));
+            border:1px solid rgba(255,255,255,0.06)); border-radius:12px;font-size:12px; color: var(--text-dim); cursor: pointer; }
+        .hdr-btn:hover { background: rgba(255,255,255,0.1); }
+        .hdr-btn:active { background: rgba(255,255,255,0.15); }
+
+        .action-btns{display:flex;gar:8px;margin-bottom:0}
+
+        .hdr-btn svg
+        {
+            width: 20px;
+            height: 20px;
+        }
+
+        .icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            padding: 4px;
+            cursor: pointer;
+        }
+
+        .icon:hover {
+            background: var(--surface3);
+            border-radius: var(--radius);
+        }
+     
+        .header-row title
+        {
+            font-weight: 600;
+            padding: 0;
+            margin: 0;
+        }
+        .header-cell {
+            flex: 1;
+            display:flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        .header-row close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 0;
+            color: var(--text-dim);
+            transition: color 0.2s;
+        }
+        .header-row close-btn:hover
+        {
+            color: var(--text);
+        }
+
+        .card .card-header {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card .card-header -pz h { flex: 0 }
+     -btn:active{transform:scale(0.97)}
+        .sheet-btn.go{
+            background:linear-gradient(135deg,var(--green-vivid),var(--green-main));
+            color:var(--bg);box-shadow:0 4px 16px rgba(0,230,118,0.2);
+        }
+        .sheet-btn.ghost{background:var(--bg);color:var(--text-dim);border:1px solid rgba(255,255,255,0.08)}
+        .sheet-btn.danger{background:rgba(255,82,82,0.1);color:var(--red);border:1px solid rgba(255,82,82,0.2)}
+
+        .hint{font-size:12px;color:var(--text-dimmer);margin-bottom:18px;line-height:1.5}
+
+        /* ===== TOAST ===== */
+        .toast{
+            position:fixed;top:72px;left:50%;
+            transform:translateX(-50%) translateY(-16px);
+            z-index:3000;
+            background:var(--green-vivid);color:var(--bg);
+            padding:10px 22px;border-radius:30px;
+            font-size:13px;font-weight:700;
+            opacity:0;transition:all .3s cubic-bezier(.32,.72,0,1);
+            pointer-events:none;white-space:nowrap;
+            box-shadow:0 4px 20px rgba(0,230,118,0.3);
+        }
+        .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+        .toast.error{background:var(--red);color:var(--white)}
+
+        /* ===== LEAFLET OVERRIDES ===== */
+        .leaflet-control-attribution{display:none !important}
+    </style>
+</head>
+<body>
+
+<!-- ===== SPLASH ===== -->
+<div id="splash">
+    <div class="splash-icon">&#9971;</div>
+    <div class="splash-title">GOLF GPS</div>
+    <div class="splash-sub">FREE NAVIGATION</div>
+    <div class="splash-loader"></div>
+</div>
+
+<!-- ===== COURSE SELECT ===== -->
+<div id="courseScreen" class="screen">
+    <div class="hero">
+        <div class="hero-title">Golf GPS Navi</div>
+        <div class="hero-sub">&#28961;&#26009;&#12468;&#12523;&#12501;&#12490;&#12499;&#12466;&#12540;&#12471;&#12519;&#12531;</div>
+    </div>
+    <div class="search-wrap">
+        <div class="search-box">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" class="search-input" id="courseSearch" placeholder="&#12468;&#12523;&#12501;&#22580;&#12434;&#26908;&#32034;..." autocomplete="off">
+        </div>
+    </div>
+    <div class="course-list" id="courseList">
+        <div class="action-btns">
+            <button class="action-btn primary" id="nearbyBtn" onclick="findNearbyCourses()">
+                &#128225; &#21608;&#36794;&#12434;&#25506;&#12377;
+            </button>
+            <button class="action-btn secondary" onclick="showAddCourseModal()">
+                &#10133; &#26032;&#35215;&#36861;&#21152;
+            </button>
+        </div>
+        <div id="savedCoursesSection"></div>
+        <div id="searchResults"></div>
+    </div>
+</div>
+
+<!-- ===== MAP SCREEN ===== -->
+<div id="mapScreen" class="screen">
+    <div class="header">
+        <button class="hdr-btn" onclick="showCourseScreen()">&#9664;&#65038;</button>
+        <h1 id="courseTitle">-</h1>
+        <button class="hdr-btn" onclick="showSettingsModal()">&#9881;&#65039;</button>
+    </div>
+    <div id="map"></div>
+
+    <div class="dist-hud" id="distHud">
+        <div class="dist-label" id="distLabel">GREEN</div>
+        <div class="dist-main">
+            <span class="dist-val" id="distVal">---</span>
+            <span class="dist-unit" id="distUnitEl">yd</span>
+        </div>
+        <div class="dist-sub" id="distSub"></div>
+    </div>
+
+    <div class="gps-badge" id="gpsBadge">
+        <div class="gps-dot" id="gpsDot"></div>
+        <span id="gpsText">GPS&#25509;&#32154;&#20013;</span>
+    </div>
+
+    <div class="hole-strip" id="holeStrip"></div>
+
+    <div class="map-fab">
+        <button class="fab-btn" id="centerBtn" onclick="centerOnUser()" title="Center">&#127919;</button>
+        <button class="fab-btn" id="layerBtn" onclick="toggleMapLayer()" title="Layer">&#127760;</button>
+        <button class="fab-btn" id="editBtn" onclick="toggleEditMode()" title="Edit">&#9999;&#65039;</button>
+    </div>
+
+    <div class="edit-banner" id="editBanner">&#128205; &#12510;&#12483;&#12503;&#12434;&#12479;&#12483;&#12503;&#12375;&#12390;&#12500;&#12531;&#12434;&#37197;&#32622;</div>
+
+    <div class="bottom-bar">
+        <button class="bar-btn active" data-type="green" onclick="setEditType('green',this)">
+            <span class="ico">&#9971;</span>GREEN
+        </button>
+        <button class="bar-btn" data-type="front" onclick="setEditType('front',this)">
+            <span class="ico">&#128308;</span>FRONT
+        </button>
+        <button class="bar-btn" data-type="back" onclick="setEditType('back',this)">
+            <span class="ico">&#128309;</span>BACK
+        </button>
+        <button class="bar-btn" data-type="bunker" onclick="setEditType('bunker',this)">
+            <span class="ico">&#9898;</span>BUNKER
+        </button>
+        <button class="bar-btn" data-type="water" onclick="setEditType('water',this)">
+            <span class="ico">&#128167;</span>WATER
+        </button>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ADD COURSE MODAL -->
+<div class="modal-bg" id="addCourseModal">
+    <div class="modal-sheet">
+        <div class="modal-pill"></div>
+        <h2>&#26032;&#12375;&#12356;&#12467;&#12540;&#12473;&#12434;&#36861;&#21152;</h2>
+        <div class="field">
+            <label>&#12467;&#12540;&#12473;&#21517;</label>
+            <input type="text" id="newCourseName" placeholder="&#20363;: &#12295;&#12295;&#12459;&#12531;&#12488;&#12522;&#12540;&#12463;&#12521;&#12502;">
+        </div>
+        <div class="field">
+            <label>&#12507;&#12540;&#12523;&#25968;</label>
+            <select id="newCourseHoles">
+                <option value="18">18&#12507;&#12540;&#12523;</option>
+                <option value="9">9&#12507;&#12540;&#12523;</option>
+                <option value="27">27&#12507;&#12540;&#12523;</option>
+                <option value="36">36&#12507;&#12540;&#12523;</option>
+            </select>
+        </div>
+        <div class="hint">&#8251; &#29694;&#22312;&#22320;&#12398;&#24231;&#27161;&#12434;&#12467;&#12540;&#12473;&#12398;&#20013;&#24515;&#22320;&#12392;&#12375;&#12390;&#30331;&#37682;&#12375;&#12414;&#12377;&#12290;&#12467;&#12540;&#12473;&#21040;&#30528;&#24460;&#12395;&#36861;&#21152;&#12375;&#12390;&#12367;&#12384;&#12373;&#12356;&#12290;</div>
+        <button class="sheet-btn go" onclick="addNewCourse()">&#10004; &#36861;&#21152;&#12377;&#12427;</button>
+        <button class="sheet-btn ghost" onclick="closeModal('addCourseModal')">&#12461;&#12515;&#12531;&#12475;&#12523;</button>
+    </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-bg" id="settingsModal">
+    <div class="modal-sheet">
+        <div class="modal-pill"></div>
+        <h2>&#9881; &#35373;&#23450;</h2>
+        <div class="field">
+            <label>&#36317;&#38626;&#34920;&#31034;&#21336;&#20301;</label>
+            <select id="unitSelect" onchange="saveSettings()">
+                <option value="yards">&#12516;&#12540;&#12489; (yd)</option>
+                <option value="meters">&#12513;&#12540;&#12488;&#12523; (m)</option>
+            </select>
+        </div>
+        <button class="sheet-btn danger" onclick="deleteCourseData()">
+            &#128465; &#12371;&#12398;&#12467;&#12540;&#12473;&#12398;&#12487;&#12540;&#12479;&#12434;&#21066;&#38500;
+        </button>
+        <button class="sheet-btn ghost" onclick="closeModal('settingsModal')" style="margin-top:4px">&#38281;&#12376;&#12427;</button>
+    </div>
+</div>
+
+<script>
+// =============================================
+// GOLF GPS APPLICATION
+// =============================================
+
+let map=null, userMarker=null, accuracyCircle=null, watchId=null;
+let currentPosition=null, currentCourse=null, currentHole=1;
+let editMode=false, editType='green', mapLayer='satellite';
+let distanceUnit='yards', markers={};
+
+const tileLayers={
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20}),
+    street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19})
+};
+
+// ---- IndexedDB ----
+const DB='GolfGPSDB';
+function openDB(){
+    return new Promise((res,rej)=>{
+        const r=indexedDB.open(DB,1);
+        r.onupgradeneeded=e=>{
+            const db=e.target.result;
+            if(!db.objectStoreNames.contains('courses'))db.createObjectStore('courses',{keyPath:'id'});
+            if(!db.objectStoreNames.contains('settings'))db.createObjectStore('settings',{keyPath:'key'});
+        };
+        r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+    });
+}
+async function saveCourse(c){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('courses','readwrite');tx.objectStore('courses').put(c);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+async function getAllCourses(){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('courses','readonly');const r=tx.objectStore('courses').getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function deleteCourse(id){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('courses','readwrite');tx.objectStore('courses').delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+async function loadSettingsDB(){try{const db=await openDB();return new Promise(res=>{const tx=db.transaction('settings','readonly');const r=tx.objectStore('settings').get('prefs');r.onsuccess=()=>res(r.result||{});r.onerror=()=>res({})})}catch{return{}}}
+async function saveSettingsDB(s){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('settings','readwrite');tx.objectStore('settings').put({key:'prefs',...s});tx.oncomplete=res;tx.onerror=()=>rej(tx.error)})}
+
+// ---- Math ----
+function haversine(lat1,lon1,lat2,lon2){
+    const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtDist(m){return distanceUnit==='meters'?{v:Math.round(m),u:'m'}:{v:Math.round(m*1.09361),u:'yd'}}
+
+// ---- UI ----
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+function showToast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(err?' error':'')+' show';setTimeout(()=>t.classList.remove('show'),2500)}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function showAddCourseModal(){document.getElementById('addCourseModal').classList.add('open');document.getElementById('newCourseName').value=''}
+function showSettingsModal(){document.getElementById('unitSelect').value=distanceUnit;document.getElementById('settingsModal').classList.add('open')}
+function saveSettings(){distanceUnit=document.getElementById('unitSelect').value;saveSettingsDB({unit:distanceUnit});updateDistance();closeModal('settingsModal')}
+function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+// ---- Course List ----
+async function renderCourseList(filter=''){
+    const courses=await getAllCourses();
+    const section=document.getElementById('savedCoursesSection');
+    const filtered=filter?courses.filter(c=>c.name.toLowerCase().includes(filter.toLowerCase())):courses;
+
+    if(!filtered.length&&!filter){
+        section.innerHTML=`<div class="empty-state"><div class="big">&#9971;</div><h3>&#12467;&#12540;&#12473;&#12364;&#12414;&#12384;&#12354;&#12426;&#12414;&#12379;&#12435;</h3><p>&#12300;&#21608;&#36794;&#12434;&#25506;&#12377;&#12301;&#12414;&#12383;&#12399;&#12300;&#26032;&#35215;&#36861;&#21152;&#12301;&#12391;&#22987;&#12417;&#12414;&#12375;&#12423;&#12358;</p></div>`;
+        return;
+    }
+    if(!filtered.length){
+        section.innerHTML=`<div class="empty-state" style="padding:24px"><p>&#12300;${escHtml(filter)}&#12301;&#12395;&#19968;&#33268;&#12377;&#12427;&#12467;&#12540;&#12473;&#12364;&#12354;&#12426;&#12414;&#12379;&#12435;</p></div>`;
+        return;
+    }
+    const holesWithData=c=>{const hd=c.holeData||{};return Object.keys(hd).filter(k=>hd[k]?.green).length};
+    section.innerHTML=`<div class="section-label">&#20445;&#23384;&#28168;&#12415; (${filtered.length})</div>`+
+        filtered.map(c=>{
+            const h=holesWithData(c);
+            return`<div class="course-card" onclick="openCourse('${c.id}')">
+                <div class="course-badge">&#9971;</div>
+                <div class="course-info">
+                    <div class="course-name">${escHtml(c.name)}</div>
+                    <div class="course-meta">${c.holes}H &middot; ${h}&#12507;&#12540;&#12523;&#35373;&#23450;&#28168; &middot; ${c.lastPlayed||'&#26410;&#12503;&#12524;&#12452'}</div>
+                </div>
+                <div class="course-arrow">&#10095;</div>
+            </div>`}).join('');
+}
+
+// ---- OSM Search ----
+async function searchOSM(q){
+    try{
+        const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' golf japan')}&format=json&limit=10&countrycodes=jp`,{headers:{'Accept-Language':'ja'}});
+        const d=await r.json();
+        return d.filter(x=>x.display_name.toLowerCase().includes('golf')||x.display_name.includes('\u30B4\u30EB\u30D5')||x.type==='golf_course'||x.class==='leisure')
+            .map(x=>({name:x.display_name.split(',')[0],lat:+x.lat,lon:+x.lon}));
+    }catch{return[]}
+}
+
+async function findNearbyCourses(){
+    const btn=document.getElementById('nearbyBtn');
+    btn.innerHTML='&#9203; &#26908;&#32034;&#20013;...';btn.disabled=true;
+    try{
+        const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:10000}));
+        const lat=pos.coords.latitude,lon=pos.coords.longitude;
+        const q=`[out:json][timeout:15];(way["leisure"="golf_course"](around:30000,${lat},${lon});relation["leisure"="golf_course"](around:30000,${lat},${lon}););out center tags;`;
+        const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+        const d=await r.json();
+        const res=document.getElementById('searchResults');
+        if(d.elements?.length){
+            const list=d.elements.map(el=>{
+                const ct=el.center||{lat:el.lat,lon:el.lon};
+                return{name:el.tags?.name||el.tags?.['name:ja']||'\u540D\u79F0\u4E0D\u660E',lat:ct.lat,lon:ct.lon,dist:haversine(lat,lon,ct.lat,ct.lon)};
+            }).sort((a,b)=>a.dist-b.dist);
+            res.innerHTML=`<div class="section-label">&#21608;&#36794;&#12398;&#12468;&#12523;&#12501;&#22580; (${list.length})</div>`+
+                list.map(c=>`<div class="course-card" onclick="importOSM('${escHtml(c.name)}',${c.lat},${c.lon})">
+                    <div class="course-badge osm">&#128205;</div>
+                    <div class="course-info"><div class="course-name">${escHtml(c.name)}</div>
+                    <div class="course-meta">&#32004;${(c.dist/1000).toFixed(1)}km</div></div>
+                    <div class="course-arrow">&#10095;</div></div>`).join('');
+        }else{
+            res.innerHTML=`<div class="empty-state" style="padding:24px"><p>&#21608;&#36794;30km&#20197;&#20869;&#12395;&#12468;&#12523;&#12501;&#22580;&#12364;&#35211;&#12388;&#12363;&#12426;&#12414;&#12379;&#12435;&#12391;&#12375;&#12383;</p></div>`;
+        }
+    }catch(e){showToast('GPS\u304C\u53D6\u5F97\u3067\u304D\u307E\u305B\u3093',nrue);console.error(e)}
+    btn.innerHTML='&#128225; &#21608;&#36794;&#12434;&#25506;&#12377;';btn.disabled=false;
+}
+
+async function importOSM(name,lat,lon){
+    const c={id:'c_'+Date.now(),name,lat,lon,holes:18,holeData:{},lastPlayed:null,createdAt:new Date().toISOString()};
+    await saveCourse(c);showToast(name+' \u3092\u8FFD\u52A0');renderCourseList();openCourse(c.id);
+}
+
+async function addNewCourse(){
+    const name=document.getElementById('newCourseName').value.trim();
+    const holes=+document.getElementById('newCourseHoles').value;
+    if(!name){showToast('\u30B3\u30FC\u30B9\u540D\u3092\u5165\u529B',true);return}
+    let lat=35.6762,lon=139.6503;
+    try{const p=await new Promise((r,j)=>navigator.geolocation.getCurrentPosition(r,j,{enableHighAccuracy:true,timeout:5000}));lat=p.coords.latitude;lon=p.coords.longitude}catch{}
+    const c={id:'c_'+Date.now(),name,lat,lon,holes,holeData:{},lastPlayed:null,createdAt:new]J
+K��T����[��
+_N]�Z]�]�P��\��J�N����S[�[
+	�Y��\��S[�[	�N�����\�
+�[YJ��L�L�N��ML�L	�Nܙ[�\���\��S\�
+
+N��[���\��J˚Y
+NB����KKKH�[���\��HKKKB�\�[���[��[ۈ�[���\��JY
+^�ۜ���\��\�X]�Z]�][��\��\�
+N�\��[���\��OX��\��\˙�[�
+�O�˚YOOZY
+N�Y�X�\��[���\��J\�]\���\��[���\��K�\�^YY[�]�]J
+K����[Q]T��[��	ژKR�	�N]�Z]�]�P��\��J�\��[���\��JN�\��[��OLN�Y][�OY�[�N��[Y[���][[Y[��RY
+	���\��U]I�K�^�۝[�X�\��[���\��K��[YN����ܙY[�	�X\�ܙY[��N�[�]X\
+
+N؝Z[�T��\
+
+N��\���
+N��Y�SX\��\��
+NB���[��[ۈ�����\��T�ܙY[�
+^�����ܙY[�	���\��T�ܙY[��N�����
+N�Y�X\
+^�X\��[[ݙJ
+N�X\[�[]\�\�X\��\�[�[�X��\�X�P�\��O[�[ܙ[�\���\��S\�
+
+_B����KKKHX\KKKB��[��[ۈ[�]X\
+
+^Y�X\
+[X\��[[ݙJ
+NX\S�X\
+	�X\	�ޛ��P�۝����[�K]�X�][ې�۝����[�_JK��]�Y]���\��[���\��K�]�\��[���\��K�ۗKM�N[S^Y\�˜�][]K�Y�X\
+NX\�ۊ	��X���ۓX\�X��NB���[��[ۈ���SX\^Y\�
+^Y�X\^Y\�OOI��][]I�^�X\��[[ݙS^Y\�[S^Y\�˜�][]JN�[S^Y\�˜��Y]�Y�X\
+N�X\^Y\�I���Y]	�B�[�^�X\��[[ݙS^Y\�[S^Y\�˜��Y]
+N�[S^Y\�˜�][]K�Y�X\
+N�X\^Y\�I��][]I�B�B���[��[ۈ�[�\�ە\�\�
+^�Y��\��[���][ۉ��X\
+[X\��]�Y]���\��[���][ۋ�]�\��[���][ۋ���KM�_B����KKKH��KKKB��[��[ۈ�\���
+^Y��]�Y
+[�]�Y�]܋��[���][ۋ��X\��]�
+�]�Y
+N�]�Y[�]�Y�]܋��[���][ۋ��]���][ۊ��O��\��[���][ۏ^�]��˘��ܙ˛]]YK�Μ�˘��ܙ˛ۙ�]YKX�Μ�˘��ܙ˘X��\�X�_N\]U\�\�X\��\�
+N�\]Q\�[��J
+N�\]Q�ИY�J
+NK\��O���[Y[���][[Y[��RY
+	���^	�K�^�۝[�I���L�NL�NWL������[Y[���][[Y[��RY
+	����	�K��\�Ә[YOI���Y��܉�K�[�X�RY�X��\�X�N��YKX^[][PY�N��[Y[�]�LJNB��[��[ۈ����
+^�Y��]�Y
+^ۘ]�Y�]܋��[���][ۋ��X\��]�
+�]�Y
+N��]�Y[�[_B���[��[ۈ\]U\�\�X\��\�
+^Y�[X\X�\��[���][ۊ\�]\���ۜ�V��\��[���][ۋ�]�\��[���][ۋ���NY�]\�\�X\��\�^�ۜ�X�S�]�X�ۊ��\�Ә[YN���[�]��[OH��Y�N�ZY��NؘX��ܛ�[���Y��؛ܙ\�����Yٙ��؛ܙ\�\�Y]\΍L	N؛�\�Y�ΌL��ؘJ�L��MK�JK��ؘJ��H���]��X�۔�^�N��NNKX�ې[��܎��KW_JN\�\�X\��\�S�X\��\��X�ێ�X��[�^ٙ��]�LJK�Y�X\
+NX\��]�Y]�M�NY[�H\�\�X\��\���]]��
+NY�X��\�X�P�\��J^�X��\�X�P�\��K��]]��
+N�X��\�X�P�\��K��]�Y]\��\��[���][ۋ�X��_B�[�^�X��\�X�P�\��OS��\��JܘY]\Θ�\��[���][ۋ�X����܎���Y����[��܎���Y����[�X�]N���ZY��_JK�Y�X\
+_B�B���[��[ۈ\]Q�ИY�J
+^Y�X�\��[���][ۊ\�]\���ۜ�OX�\��[���][ۋ�X���Y��[Y[���][[Y[��RY
+	����	�KY��[Y[���][[Y[��RY
+	���^	�N���\�Ә[YOI���Y�	��OLL��ΘOL�����Ή��܉�N�^�۝[�X��L�I�X]���[�
+J_[XB����KKKH\�[��HKKKB��[��[ۈ\]Q\�[��J
+^Y�X�\��[���][ۊ\�]\���ۜ�X�\��[���\��O˚�Q]O˖��\��[��WNY�Z˙ܙY[�^��[Y[���][[Y[��RY
+	�\��[	�K�^�۝[�I�KKI���[Y[���][[Y[��RY
+	�\��X��K�[��\�SI��[��[OH���܎��\�K]^Y[[Y\�H��M�NNM�͗L�L�L���L��WL���L��L�PWL���L���L�L�NL�MP�PO��[�����[Y[���][[Y[��RY
+	�\�X�[	�K�^�۝[�I�	���\��[��N�]\��B��ۜ��Z]�\��[�J�\��[���][ۋ�]�\��[���][ۋ����ܙY[��]�ܙY[��ۊN�ۜ�Y�]\�
+�
+N��[Y[���][[Y[��RY
+	�\��[	�K�^�۝[�Y����[Y[���][[Y[��RY
+	�\�[�][	�K�^�۝[�Y�N��[Y[���][[Y[��RY
+	�\�X�[	�K�^�۝[�I�	���\��[��J��ԑQS���]�X�I��Y����۝
+^��ۜ��Y�]\�
+]�\��[�J�\��[���][ۋ�]�\��[���][ۋ������۝�]���۝�ۊJN��X��X]��\��H�\�\�X�Z][H��]��\��H�\�\�X�Y���۝���]���	ٙ��Iٙ�_O�]��B�Y���X��^��ۜ��Y�]\�
+]�\��[�J�\��[���][ۋ�]�\��[���][ۋ�����X�˛]��X�˛ۊJN��X��X]��\��H�\�\�X�Z][H��]��\��H�\�\�X�Y��X�ȏ��]���	ؙ��Iؙ�_O�]��B���[Y[���][[Y[��RY
+	�\��X��K�[��\�S\�X�B����KKKH�H��\KKKB��[��[ۈ�Z[�T��\
+
+^�ۜ��Y��[Y[���][[Y[��RY
+	��T��\	�N�ۜ��X�\��[���\��K��\�]X�]ۈ�\��H��K[�]��ۘ�X��H��ܛ�
+LJH��L�P��؝]ۏ��܊]OLN�O[��J��^�ۜ����SX]�X��KX�\��[��JOL��ۜ�\�ܙY[�X�\��[���\��K��Q]O˖�WO˙ܙY[�
+�X�]ۈ�\��H��KX�\	�OOOX�\��[��O��X�]�IΉ��H�ۘ�X��H��[X��J	�_JH��[OH�\�^N������ٛ^	ΉۛۙI�I�\�ܙY[���؛ܙ\�X��܎��ؘJ��LN��IΉ��H���_O؝]ۏ�B�
+�X�]ۈ�\��H��K[�]��ۘ�X��H��ܛ�
+JH��L�P��؝]ۏ�˚[��\�SZB��[��[ۈ�[X��J�^��\��[��O[���X\�X\��\��
+N��Y�SX\��\��
+N؝Z[�T��\
+
+N�\]Q\�[��J
+_B��[��[ۈ�ܛ�
+
+^�]�X�\��[��J��Y��J[�X�\��[���\��K��\��Y����\��[���\��K��\�[�LN��[X��J�_B����KKKHX\��\��KKKB��[��[ۈZ�X�ۊ\J^�ۜ�ٙ�^�ܙY[���N��L�����Ό͋Ή��M�͉�K��۝��N��Q�Q�	�Ό��Ή�ٙ�L�L��K�X�Ξ�N��Q�Q�I�Ό��Ή��Y���K�[��\���N��L��PI�Ό�Ή�ٙ�L��K�]\���N��Q�Q�M��Ό��Ή������_V�\W_�N��L�����Ό͋Ή��M�͉�N�]\���]�X�ۊ��\�Ә[YN���[�]��[OH��۝\�^�N��ٙ˜�\ٚ[\����\�Y�����ؘJ�JJN�^X[Yێ��[�\��[�KZZY��H���ٙ˙_O�]��X�۔�^�N��ٙ˜�ٙ˜�KX�ې[��܎��ٙ˜�̋ٙ˜�_JNB���[��[ۈ�X\�X\��\��
+^�ؚ�X���[Y\�X\��\��K��]
+
+K��ܑXX�
+OO��Y�I��K��[[ݙJ[K��[[ݙJ
+_JN�X\��\��^�_B���[��[ۈ�Y�SX\��\��
+^�X\�X\��\��
+N�ۜ�X�\��[���\��O˚�Q]O˖��\��[��WN�Y�Z
+\�]\�����ܙY[��	ٜ�۝	�	ؘX���K��ܑXX�
+O�Y�Z�J\�]\���ۜ�OS�X\��\���K�]�K�ۗK�X�ێ�Z�X�ۊ
+K�Y��X�N�Y][�_JK�Y�X\
+NK�ۊ	��Y�[�	�
+
+OO���ۜ�[K��]]��
+N��O^�]��]ێ����N��]�P��\��J�\��[���\��JN�\]Q\�[��J
+_JNK�ۊ	��X���
+
+OO�Y�X�\��[���][۟OOI�ܙY[��\�]\���ۜ�Y�]\�
+]�\��[�J�\��[���][ۋ�]�\��[���][ۋ����K�]�K�ۊJNK��[��\
+���OOIٜ�۝	��ќ�۝	ΉИX���O؏�������H	��_X
+K��[��\
+
+NJNX\��\���O[NJN��؝[��\��	��]\��K��ܑXX�
+O��ۜ�\��Z�
+����_�N�X\��\���
+����OV�N\����ܑXX�
+
+][KJOO��ۜ�OS�X\��\��][K�]][K�ۗK�X�ێ�Z�X�ۊ
+K�Y��X�N�Y][�_JK�Y�X\
+NK�ۊ	��X���
+
+OO�Y�Y][�J^Y��ۙ�\�JL�L�L��I�OOI؝[��\����L�L���L�P�L���Ή�M�͌	�WL�L�ML�WNM��Q��Q�
+J^X\��[[ݙS^Y\�JN�\����X�JKJN��
+����OX\����]�P��\��J�\��[���\��JN��Y�SX\��\��
+NB�Y[�HY��\��[���][ۊ^�ۜ�Y�]\�
+]�\��[�J�\��[���][ۋ�]�\��[���][ۋ���][K�]][K�ۊJNK��[��\
+���OOI؝[��\���Н[��\�Ή��]\��O؏�������H	��_X
+K��[��\
+
+NB�JNK�ۊ	��Y�[�	�
+
+OO���ۜ�[K��]]��
+N�\���WO^�]��]ێ����N��
+����OX\����]�P��\��J�\��[���\��J_JNX\��\���
+����K�\�
+JNJNJN����]�[�H���H\�\��ܙY[��Y�X\��\�˙ܙY[����\��[���][ۊ^�ۜ�[�OS��[[�J���\��[���][ۋ�]�\��[���][ۋ���K��ܙY[��]�ܙY[��ۗWK��܎�ܙؘJ��LN�
+I��ZY���\�\��^N��	JK�Y�X\
+NX\��\�˗�[�O[[�NB�B����KKKHY]KKKB��[��[ۈ���QY][�J
+^Y][�OHYY][�N��[Y[���][[Y[��RY
+	�Y]���K��\��\�����J	�X�]�I�Y][�JN��[Y[���][[Y[��RY
+	�Y]�[��\��K��\��\�����J	ݚ\�X�I�Y][�JN����\�
+Y][�O��M�NNM�͗L�L�L���L��HӉΉ�M�NNM�͗L�L�L���L��Hё��N�Y�SX\��\��
+NB���[��[ۈ�]Y]\J\K[
+^Y]\O]\N��[Y[��]Y\�T�[X�ܐ[
+	˘�\�X���K��ܑXX�
+�O����\��\���[[ݙJ	�X�]�I�JNY�[
+Y[��\��\��Y
+	�X�]�I�N�ۜ�X�[�^�ܙY[���L��L�PWL���L���L�L�L���L���L��L���NLMMэ�I���۝��L�WL�QL���L��L�NL���L��L�L�L���L���L��L���NLMMэ�I��X�Ή�L�L���L�Q�L�NL���L��L�L�L���L���L��L���NLMMэ�I��[��\���L�L���L�P�L���L�L�L���L���L��L���NLMMэ�I��]\���M�͌L�L�L���L���L��L���NLMMэ�I�N��[Y[���][[Y[��RY
+	�Y]�[��\��K�^�۝[�I�Q�Q��	��X�[��\WNB���[��[ۈۓX\�X��J^Y�YY][�J\�]\���ۜ��]�Λ۟OYK�]��Y�X�\��[���\��K��Q]JX�\��[���\��K��Q]O^�NY�X�\��[���\��K��Q]V��\��[��WJX�\��[���\��K��Q]V��\��[��WO^�N�ۜ�X�\��[���\��K��Q]V��\��[��WN�Y���ܙY[��	ٜ�۝	�	ؘX���K�[��Y\�Y]\JJZ�Y]\WO^�]۟N[�HY�Y]\OOOI؝[��\��^�Y�Z��[��\��Z��[��\��V�N���[��\�˜\�
+�]۟J_B�[�HY�Y]\OOOI��]\��^�Y�Z��]\��Z��]\��V�N���]\�˜\�
+�]۟J_B���]�P��\��J�\��[���\��JN��Y�SX\��\��
+N�\]Q\�[��J
+N؝Z[�T��\
+
+N����\�
+	��\��[��_H	�Y]\K��\\��\�J
+_HNL�MP�PWMP��MN�
+NB����KKKH[]HKKKB�\�[���[��[ۈ[]P��\��Q]J
+^Y�X�\��[���\��_X�ۙ�\�J�\��[���\��K��[YJ��L��WL���L���L���L�L�ML�WNM��Q��Q��J\�]\��]�Z][]P��\��J�\��[���\��K�Y
+N����S[�[
+	��][���[�[	�N������\��T�ܙY[�
+N�����\�
+	�L���L���L��WL�L�ML�WNM��	�NB����KKKH�X\��KKKB�]�X\��[Y\���[Y[���][[Y[��RY
+	���\��T�X\��	�K�Y]�[�\�[�\�	�[�]	��[��[ۊJ^�ۜ�OYK�\��]��[YK��[J
+N��X\�[Y[�]
+�X\��[Y\�Nܙ[�\���\��S\�
+JNY�K�[���L�^�X\��[Y\�\�][Y[�]
+\�[��
+OO��ۜ��\�X]�Z]�X\����JJN�ۜ��Y��[Y[���][[Y[��RY
+	��X\���\�[��NY��\˛[��
+X˚[��\�SX]��\��H��X�[ۋ[X�[��M�LP�M���M�LM��P��]��
+ܙ\˛X\
+�O��]��\��H���\��KX�\��ۘ�X��H�[\ܝ��J	��\��[
+���[YJ_I�	܋�]K	܋�۟JH���]��\��H���\��KX�Y�H��H��Q�Q�]���]��\��H���\��KZ[��ȏ�]��\��H���\��K[�[YH���\��[
+���[YJ_O�]���]��\��H���\��K[Y]H���[���Y]X\�]���]���]��\��H���\��KX\���ȏ�L��O�]���]��
+K���[�	��NK
+NY[�H��[Y[���][[Y[��RY
+	��X\���\�[��K�[��\�SI��JN���KKKH[�[���HKKKB���[Y[��]Y\�T�[X�ܐ[
+	˛[�[X���K��ܑXX�
+��O��˘Y]�[�\�[�\�	��X����[��[ۊJ^�Y�K�\��]OO]\�]\˘�\��\���[[ݙJ	��[��_JJN���KKKH[�]KKKB�\�[���[��[ۈ[�]
+
+^�ۜ��X]�Z]�Y�][����
+N�Y�˝[�]
+Y\�[��U[�]\˝[�]]�Z]�[�\���\��S\�
+
+N�][Y[�]
+
+
+OO����[Y[���][[Y[��RY
+	��\�	�K��\��\��Y
+	�Y[��N�����ܙY[�	���\��T�ܙY[��N��][Y[�]
+
+
+OO���[Y[���][[Y[��RY
+	��\�	�K��[[ݙJ
+K�
+_KL�
+NB�Y�	��\��X�U�ܚ�\��[��]�Y�]܊]�[��˘Y]�[�\�[�\�	��Y	�
+
+OO��]�Y�]܋��\��X�U�ܚ�\���Y�\�\�	��˚���K��]�
+
+
+OO��JJN[�]
+
+N��ܚ\��؛�O���[�
